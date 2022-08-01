@@ -130,7 +130,7 @@ class ErrataEmailNotifications:
 
             # Check last processed and succesfully sent errata email
             last_processed_ts_file = dist + '_last_processed_ts'
-            if not os.path.exists(last_processed_ts_file):
+            if not os.path.exists(os.path.join(BASEPATH, last_processed_ts_file)):
                 # This is the first time the script is running.
                 # To avoid sending an email for every errata entry,
                 # we'll create the file with the last updated errata entry.
@@ -157,7 +157,7 @@ class ErrataEmailNotifications:
             for errata in reversed(new_erratas):
                 # TODO: Make an errata class so retrieving info in the way
                 # we need is more comfortable for our purposes
-                email_subject = SUBJECT_TEMPLATE.substitute(
+                subject = SUBJECT_TEMPLATE.substitute(
                     errata_type=errata['type'].capitalize(),
                     # TODO: Add some checks to ensure that we include
                     # the errata_id at the beginning of the title.
@@ -165,7 +165,7 @@ class ErrataEmailNotifications:
                     # the errata info from RHEL and sometimes it differs
                     errata_title=errata['title']
                 )
-                email_body = CONTENT_TEMPLATE.substitute(
+                content = CONTENT_TEMPLATE.substitute(
                     errata_type=errata['type'].capitalize(),
                     errata_severity=errata['severity'].capitalize(),
                     errata_date=self.ts_to_date(errata['updated_date']['$date']),
@@ -176,8 +176,8 @@ class ErrataEmailNotifications:
                 msg = EmailMessage()
                 msg['From'] = f'{EMAIL_FROM_NAME} <{self.sender}>'
                 msg['To'] = self.recipient
-                msg['Subject'] = email_subject
-                msg.set_content(email_body)
+                msg['Subject'] = subject
+                msg.set_content(content)
 
                 try:
                     self.smtp_session.send(msg)
