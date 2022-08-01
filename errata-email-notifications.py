@@ -94,11 +94,11 @@ class SMTPSession:
         except FileNotFoundError as err:
             logging.error('Stopped execution of %s, error was: %s', __file__, err)
             sys.exit('Could not read app-passwd file. Please check that you '\
-                     'provide an app-passwd file within the scripts folder')
+                     'provide an app-passwd file within the script folder')
 
 
     def send(self, msg):
-        logging.debug('SMTPSession::send_email: %s', msg.as_string())
+        logging.debug('Sending email with subject: %s', msg.get('Subject'))
         self.__service.send_message(msg)
 
 

@@ -24,10 +24,10 @@ The script needs to be called with 3 arguments:
 * The email we want to send the notifications to
 
 If you want to send errata notifications for AlmaLinux 8, you can run:
-```python errata-notifications.py -d almalinux-8 -s sender@gmail.com -r recipient@mail.com```
+```python errata-email-notifications.py -d almalinux-8 -s sender@gmail.com -r recipient@mail.com```
 
 If you want to send errata notifications for both AlmaLinux 8 and 9, and also enabling the verbose mode, you can run:
-```python errata-notifications.py -d almalinux-8 almalinux-9 -s sender@gmail.com -r recipient@mail.com -v```
+```python errata-email-notifications.py -d almalinux-8 almalinux-9 -s sender@gmail.com -r recipient@mail.com -v```
 
 __Note:__ To avoid the unfortunate situation of sending notifications for every errata in a distribution, the first run will only save the last errata's timestamp.
 The next run the script will send the email notifications if there are any of them.
