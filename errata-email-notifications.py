@@ -50,6 +50,10 @@ def parse_args():
         '-s', '--sender', type=str, required=True,
         help='Email address to use to send the emails'
     )
+    # TODO: If needed, we can update the script to send to multiple recipients.
+    # If we want to make this, we should update this argument to receive multiple
+    # email addresses and also update ErrataEmailNotifications.run method to take
+    # them into account when formatting the email to send.
     parser.add_argument(
         '-r', '--recipient', type=str, required=True,
         help='Email address to send the emails to'
