@@ -15,10 +15,12 @@ from urllib import request
 # For simplicity, we store files in the same folder as the script lives in.
 # These files are:
 #  * [distribution]_last_processed_ts: One file per distribution
-#  * app-passwd: GMail application password
+#  * app-passwd: Gmail application password
+#  * errata-email-notifications.log: File to save logging output
 # For this reason, we'll use BASEPATH anytime we read/write files and
 # can be changed in the future if needed
 BASEPATH = os.path.dirname(__file__)
+LOGFILE = os.path.join(BASEPATH, 'errata-email-notifications.log')
 
 DISTRIBUTIONS_ERRATA_URL = {
     'almalinux-8': 'https://errata.almalinux.org/8/errata.json',
@@ -38,7 +40,8 @@ def parse_args():
                     'and sends email notifications to the recipient provided.'
     )
     parser.add_argument(
-        '-d', '--distribution', type=str, nargs='+', required=True,
+        '-d', '--distributions', type=str, nargs='+',
+        required=True, choices=list(DISTRIBUTIONS_ERRATA_URL.keys()),
         help='Distribution(s) to fetch/send errata notifications'
     )
     # TODO: Add email verification such as format or even
@@ -53,8 +56,15 @@ def parse_args():
         help='Email address to send the emails to'
     )
     parser.add_argument(
+        '-l', '--logfile', type=str, required=False, dest='logfile',
+        help='Full path to the file to save logging output. If not set, ' \
+             'the logs will be saved into errata-email-notifications.log'
+    )
+    parser.add_argument(
         '-v', '--verbose', required=False, action='store_true',
-        help='Whether we want to produce verbose logging'
+        help='Whether you want to output logging info into console. ' \
+             'Note that enabling this option will stop the script to log ' \
+             'into the log file. Use it for debugging/testing purposes only.'
     )
 
     return parser.parse_args()
@@ -99,11 +109,6 @@ class ErrataEmailNotifications:
     def run(self):
         logging.info('Starting execution of %s', __file__)
         for dist in self.distributions:
-            # Check that the user doesn't enter an invalid distributon
-            if (dist not in DISTRIBUTIONS_ERRATA_URL):
-                logging.warning('Skipping %s as it is not a valid distribution', dist)
-                continue
-
             logging.debug('Processing erratas for distribution %s', dist)
             errata_json_url = DISTRIBUTIONS_ERRATA_URL[dist]
             errata_data = self.fetch_errata_data(errata_json_url)
@@ -217,13 +222,20 @@ class ErrataEmailNotifications:
 if __name__ == '__main__':
     args = parse_args()
 
-    # Set debug level
-    # TODO: Maybe allowing specific logging level?
-    log_level = logging.DEBUG if args.verbose else logging.WARNING
-    logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', level=log_level)
+    # When using --verbose or -v the logging output will go to console
+    # and will disable logging into a file. This option is only recommended
+    # to be used when doing debugging or testing of the script.
+    if not args.verbose:
+        logfile = args.logfile if args.logfile else LOGFILE
+    else:
+        logfile = None
+
+    logging.basicConfig(filename=logfile,
+                        format='%(asctime)s %(levelname)s %(message)s',
+                        level=logging.DEBUG)
 
     errata_notifications = ErrataEmailNotifications(
-            args.distribution,
+            args.distributions,
             args.sender,
             args.recipient)
 
