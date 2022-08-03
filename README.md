@@ -31,6 +31,10 @@ The script needs to be called with 3 arguments:
 * The email we want to use when sending the email notifications. For now it only supports Gmail accounts.
 * The email we want to send the notifications to
 
+The script has also optional arguments to:
+* Indicate the logfile you want the script to use to log its output. By default the logs will go into _errata-email-notifications.log_
+* Indicate whether you want to enable the verbose mode and get the logging output to console. When enabled, the script won't log into a logfile, this is useful when you're working on the script or debugging it.
+
 If you want to send errata notifications for AlmaLinux 8, you can run:
 ```python errata-email-notifications.py -d almalinux-8 -s sender@gmail.com -r recipient@mail.com```
 
