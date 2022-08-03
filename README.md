@@ -4,8 +4,16 @@ This script checks the public errata json files for AlmaLinux distributions and 
 ## Requirements
 
 ### Dependencies
-The script does not use external libraries, only Python's built-in modules.
+
+* requests = 2.28.1
+
 We used Python 3.8 when creating the script but should work with any Python 3.x version.
+
+The recommended workflow to install dependencies is:
+```
+python3 -m venv venv && source venv/bin/activate
+pip3 install -r requirements.txt
+```
 
 ### Gmail Application Password
 In order for the script to run, you have to provide a [Gmail Application Password](https://support.google.com/accounts/answer/185833).

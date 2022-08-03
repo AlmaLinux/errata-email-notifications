@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 import argparse
-import json
 import logging
 import os
+import requests
 import smtplib
 import ssl
 import sys
@@ -10,7 +10,6 @@ import sys
 from datetime import datetime
 from email.message import EmailMessage
 from string import Template
-from urllib import request
 
 # For simplicity, we store files in the same folder as the script lives in.
 # These files are:
@@ -185,8 +184,8 @@ class ErrataEmailNotifications:
         # when we reach the last_processed_ts. This could save some memory allocation
         # during the execution of the script.
         try:
-            response = request.urlopen(url)
-            data = json.loads(response.read())
+            response = requests.get(url)
+            data = response.json()
             # We want to return sorted erratas in descending order
             sorted_data = sorted(data,
                                  key=lambda x: x['updated_date']['$date'],
