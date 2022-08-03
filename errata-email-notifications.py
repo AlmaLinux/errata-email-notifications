@@ -25,29 +25,11 @@ DISTRIBUTIONS_ERRATA_URL = {
     'almalinux-9': 'https://errata.almalinux.org/9/errata.json'
 }
 
-EMAIL_FROM_NAME = 'AlmaLinux Errata Notifications'
+FULL_SENDER_NAME = 'AlmaLinux Errata Notifications'
 # We create the templates for both subject and content beforehand
 SUBJECT_TEMPLATE = Template('[$errata_type Advisory] $errata_title')
-# TODO: Read content template from file?
-CONTENT_TEMPLATE = Template(
-"""Hi, you are receiving an AlmaLinux $errata_type update email because you subscribed to receive errata notifications from AlmaLinux.
-
-Type: $errata_type
-Severity: $errata_severity
-Release date: $errata_date
-
-Summary:
-
-$errata_description
-
-Full details, updated packages, references, and other related information: $errata_link
-
-This message is automatically generated, please don’t reply. For further questions, please, contact us via the AlmaLinux community chat: https://chat.almalinux.org/.
-Want to change your notification settings? Sign in and manage mailing lists on https://lists.almalinux.org.
-
-Kind regards,
-AlmaLinux team
-""")
+with open(os.path.join(BASEPATH, 'email-content-template'), 'r') as f:
+    CONTENT_TEMPLATE = Template(f.read())
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -115,6 +97,7 @@ class ErrataEmailNotifications:
 
 
     def run(self):
+        logging.info('Starting execution of %s', __file__)
         for dist in self.distributions:
             # Check that the user doesn't enter an invalid distributon
             if (dist not in DISTRIBUTIONS_ERRATA_URL):
@@ -157,7 +140,7 @@ class ErrataEmailNotifications:
             for errata in reversed(new_erratas):
                 # TODO: Make an errata class so retrieving info in the way
                 # we need is more comfortable for our purposes
-                subject = SUBJECT_TEMPLATE.substitute(
+                email_subject = SUBJECT_TEMPLATE.substitute(
                     errata_type=errata['type'].capitalize(),
                     # TODO: Add some checks to ensure that we include
                     # the errata_id at the beginning of the title.
@@ -165,7 +148,7 @@ class ErrataEmailNotifications:
                     # the errata info from RHEL and sometimes it differs
                     errata_title=errata['title']
                 )
-                content = CONTENT_TEMPLATE.substitute(
+                email_content = CONTENT_TEMPLATE.substitute(
                     errata_type=errata['type'].capitalize(),
                     errata_severity=errata['severity'].capitalize(),
                     errata_date=self.ts_to_date(errata['updated_date']['$date']),
@@ -174,10 +157,10 @@ class ErrataEmailNotifications:
                 )
 
                 msg = EmailMessage()
-                msg['From'] = f'{EMAIL_FROM_NAME} <{self.sender}>'
+                msg['From'] = f'{FULL_SENDER_NAME} <{self.sender}>'
                 msg['To'] = self.recipient
-                msg['Subject'] = subject
-                msg.set_content(content)
+                msg['Subject'] = email_subject
+                msg.set_content(email_content)
 
                 try:
                     self.smtp_session.send(msg)
