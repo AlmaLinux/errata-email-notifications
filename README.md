@@ -1,5 +1,5 @@
 # AlmaLinux Errata Email Notifications
-This script checks the public errata json files for AlmaLinux distributions and sends notification emails with every new update.
+The AlmaLinux Errata Email Notifications script checks the public errata json files for AlmaLinux distributions and sends notification emails with every new update.
 
 ## Requirements
 
@@ -11,8 +11,12 @@ We used Python 3.8 when creating the script but should work with any Python 3.x 
 
 The recommended workflow to install dependencies is:
 ```
-python3 -m venv venv && source venv/bin/activate
 pip3 install -r requirements.txt
+```
+
+If you want to use a Python virtual environment you can create it by running:
+```
+python3 -m venv venv && source venv/bin/activate
 ```
 
 ### Gmail Application Password
@@ -36,10 +40,10 @@ The script has also optional arguments to:
 * Indicate whether you want to enable the verbose mode and get the logging output to console. When enabled, the script won't log into a logfile, this is useful when you're working on the script or debugging it.
 
 If you want to send errata notifications for AlmaLinux 8, you can run:
-```python errata-email-notifications.py -d almalinux-8 -s sender@gmail.com -r recipient@mail.com```
+```errata-email-notifications -d almalinux-8 -s sender@gmail.com -r recipient@mail.com```
 
 If you want to send errata notifications for both AlmaLinux 8 and 9, and also enabling the verbose mode, you can run:
-```python errata-email-notifications.py -d almalinux-8 almalinux-9 -s sender@gmail.com -r recipient@mail.com -v```
+```errata-email-notifications -d almalinux-8 almalinux-9 -s sender@gmail.com -r recipient@mail.com -v```
 
 __Note:__ To avoid the unfortunate situation of sending notifications for every errata in a distribution, the first run will only save the last errata's timestamp.
 The next run the script will send the email notifications if there are any of them.
