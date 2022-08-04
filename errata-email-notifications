@@ -35,7 +35,7 @@ with open(os.path.join(BASEPATH, 'email-content-template'), 'r') as f:
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        'errata-email-notifications.py',
+        'errata-email-notifications',
         description='AlmaLinux errata email notifications script. Parses public errata files '
                     'and sends email notifications to the recipient provided.'
     )
