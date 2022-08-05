@@ -162,7 +162,7 @@ class ErrataEmailNotifications:
                     errata_severity=errata['severity'].capitalize(),
                     errata_date=self.ts_to_date(errata['updated_date']['$date']),
                     errata_description=errata['description'],
-                    errata_link=self.get_almalinux_errata_href(errata)
+                    errata_link=self.get_almalinux_errata_href(errata, dist)
                 )
 
                 msg = EmailMessage()
@@ -213,13 +213,13 @@ class ErrataEmailNotifications:
         return datetime.utcfromtimestamp(ts/1000).strftime('%Y-%m-%d')
 
 
-    def get_almalinux_errata_href(self, errata):
-        href = ''
-        for ref in errata['references']:
-            # TODO: Better check if type equals to 'self'?
-            if ref['id'] == errata['updateinfo_id']:
-                href = ref['href']
-                break
+    def get_almalinux_errata_href(self, errata, dist):
+        # Some erratas aren't including the reference to 'AL' ids.
+        # For this reason, we need to format the url manually
+        dist_version = dist.split("-")[-1]
+        errata_id = errata['updateinfo_id'].replace(':', '-')
+        href = f'https://errata.almalinux.org/{dist_version}/{errata_id}.html'
+
         return href
 
 
