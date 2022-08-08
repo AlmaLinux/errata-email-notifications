@@ -1,0 +1,17 @@
+Hi, you are receiving an AlmaLinux $errata_type update email because you subscribed to receive errata notifications from AlmaLinux.
+
+Type: $errata_type
+Severity: $errata_severity
+Release date: $errata_date
+
+Summary:
+
+$errata_description
+
+Full details, updated packages, references, and other related information: $errata_link
+
+This message is automatically generated, please don’t reply. For further questions, please, contact us via the AlmaLinux community chat: https://chat.almalinux.org/.
+Want to change your notification settings? Sign in and manage mailing lists on https://lists.almalinux.org.
+
+Kind regards,
+AlmaLinux team

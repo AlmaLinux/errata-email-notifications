@@ -1,0 +1,246 @@
+#!/usr/bin/env python3 
+# -*- coding: utf-8 -*-
+import argparse
+import logging
+import os
+import requests
+import smtplib
+import ssl
+import sys
+
+from datetime import datetime
+from email.message import EmailMessage
+from string import Template
+
+# For simplicity, we store files in the same folder as the script lives in.
+# These files are:
+#  * [distribution]_last_processed_ts: One file per distribution
+#  * app-passwd: Gmail application password
+#  * errata-email-notifications.log: File to save logging output
+# For this reason, we'll use BASEPATH anytime we read/write files and
+# can be changed in the future if needed
+BASEPATH = os.path.dirname(__file__)
+LOGFILE = os.path.join(BASEPATH, 'errata-email-notifications.log')
+
+DISTRIBUTIONS_ERRATA_URL = {
+    'almalinux-8': 'https://errata.almalinux.org/8/errata.json',
+    'almalinux-9': 'https://errata.almalinux.org/9/errata.json'
+}
+
+FULL_SENDER_NAME = 'AlmaLinux Errata Notifications'
+# We create the templates for both subject and content beforehand
+SUBJECT_TEMPLATE = Template('[$errata_type Advisory] $errata_title')
+with open(os.path.join(BASEPATH, 'email-content-template'), 'r') as f:
+    CONTENT_TEMPLATE = Template(f.read())
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        'errata-email-notifications',
+        description='AlmaLinux errata email notifications script. Parses public errata files '
+                    'and sends email notifications to the recipient provided.'
+    )
+    parser.add_argument(
+        '-d', '--distributions', type=str, nargs='+',
+        required=True, choices=list(DISTRIBUTIONS_ERRATA_URL.keys()),
+        help='Distribution(s) to fetch/send errata notifications'
+    )
+    # TODO: Add email verification such as format or even
+    # check that it is a valid email address. py3-validate-email
+    # python package can help here.
+    parser.add_argument(
+        '-s', '--sender', type=str, required=True,
+        help='Email address to use to send the emails'
+    )
+    # TODO: If needed, we can update the script to send to multiple recipients.
+    # If we want to make this, we should update this argument to receive multiple
+    # email addresses and also update ErrataEmailNotifications.run method to take
+    # them into account when formatting the email to send.
+    parser.add_argument(
+        '-r', '--recipient', type=str, required=True,
+        help='Email address to send the emails to'
+    )
+    parser.add_argument(
+        '-l', '--logfile', type=str, required=False, dest='logfile',
+        help='Full path to the file to save logging output. If not set, ' \
+             'the logs will be saved into errata-email-notifications.log'
+    )
+    parser.add_argument(
+        '-v', '--verbose', required=False, action='store_true',
+        help='Whether you want to output logging info into console. ' \
+             'Note that enabling this option will stop the script to log ' \
+             'into the log file. Use it for debugging/testing purposes only.'
+    )
+
+    return parser.parse_args()
+
+
+class SMTPSession:
+    def __init__(self, user):
+        self.__user = user
+        self.__passwd = self.__read_app_passwd()
+        self.__service = smtplib.SMTP_SSL('smtp.gmail.com', 465,
+                                          context=ssl.create_default_context())
+        # TODO: Add some error handling
+        self.__service.login(self.__user, self.__passwd)
+
+    def __read_app_passwd(self):
+        try:
+            with open(os.path.join(BASEPATH, 'app-passwd'), 'r') as f:
+                return f.readline()
+        except FileNotFoundError as err:
+            logging.error('Stopped execution of %s, error was: %s', __file__, err)
+            sys.exit('Could not read app-passwd file. Please check that you '\
+                     'provide an app-passwd file within the script folder')
+
+
+    def send(self, msg):
+        logging.debug('Sending email with subject: %s', msg.get('Subject'))
+        self.__service.send_message(msg)
+
+
+    def close(self):
+        self.__service.quit()
+
+
+class ErrataEmailNotifications:
+    def __init__(self, distributions, sender, recipient):
+        self.distributions = distributions
+        self.sender = sender
+        self.recipient = recipient
+        self.smtp_session = SMTPSession(sender)
+
+
+    def run(self):
+        logging.info('Starting execution of %s', __file__)
+        for dist in self.distributions:
+            logging.debug('Processing erratas for distribution %s', dist)
+            errata_json_url = DISTRIBUTIONS_ERRATA_URL[dist]
+            errata_data = self.fetch_errata_data(errata_json_url)
+            if not errata_data:
+                logging.warning('Could not fetch errata file for %s, skipping', dist)
+                continue
+
+            # Check last processed and succesfully sent errata email
+            last_processed_ts_file = dist + '_last_processed_ts'
+            if not os.path.exists(os.path.join(BASEPATH, last_processed_ts_file)):
+                # This is the first time the script is running.
+                # To avoid sending an email for every errata entry,
+                # we'll create the file with the last updated errata entry.
+                # Next time the script runs is going to only send emails
+                # with the most recent errata entries.
+                self.save_last_processed_ts(last_processed_ts_file,
+                                       errata_data[0]['updated_date']['$date'])
+                logging.warning('Skipping notifications for %s as it looks like ' \
+                                'is the first time this script is running', dist)
+                continue
+
+            with open(os.path.join(BASEPATH, last_processed_ts_file), 'r') as f:
+                last_processed_ts = f.readline()
+            # Only take those whose ts is bigger than last_processed_ts
+            new_erratas = [
+                x for x in errata_data
+                if x['updated_date']['$date'] > int(last_processed_ts)
+            ]
+            logging.debug('Found %d new erratas for %s distribution',
+                len(new_erratas), dist
+            )
+
+            # We want to start sending notifications from the oldest one
+            for errata in reversed(new_erratas):
+                # TODO: Make an errata class so retrieving info in the way
+                # we need is more comfortable for our purposes
+                email_subject = SUBJECT_TEMPLATE.substitute(
+                    errata_type=errata['type'].capitalize(),
+                    # TODO: Add some checks to ensure that we include
+                    # the errata_id at the beginning of the title.
+                    # Apparently, there's no strict format, we just copy
+                    # the errata info from RHEL and sometimes it differs
+                    errata_title=errata['title']
+                )
+                email_content = CONTENT_TEMPLATE.substitute(
+                    errata_type=errata['type'].capitalize(),
+                    errata_severity=errata['severity'].capitalize(),
+                    errata_date=self.ts_to_date(errata['updated_date']['$date']),
+                    errata_description=errata['description'],
+                    errata_link=self.get_almalinux_errata_href(errata, dist)
+                )
+
+                msg = EmailMessage()
+                msg['From'] = f'{FULL_SENDER_NAME} <{self.sender}>'
+                msg['To'] = self.recipient
+                msg['Subject'] = email_subject
+                msg.set_content(email_content)
+
+                try:
+                    self.smtp_session.send(msg)
+                    self.save_last_processed_ts(last_processed_ts_file,
+                                                errata['updated_date']['$date'])
+                except:
+                    logging.error('Could not send errata notification email')
+
+        self.smtp_session.close()
+
+
+    def fetch_errata_data(self, url):
+        logging.debug('Fetching errata data from %s', url)
+        # TODO: If this script requires a considerable allocation of memory, we can
+        # figure out if we can publish the errata json files sorted by date.
+        # This way we can think about reading the response in chunks and stop reading
+        # when we reach the last_processed_ts. This could save some memory allocation
+        # during the execution of the script.
+        try:
+            response = requests.get(url)
+            data = response.json()
+            # We want to return sorted erratas in descending order
+            sorted_data = sorted(data,
+                                 key=lambda x: x['updated_date']['$date'],
+                                 reverse=True)
+        except:
+            # Maybe more fine grained exception handling?
+            sorted_data = None
+        finally:
+            return sorted_data
+
+
+    def save_last_processed_ts(self, file_to_write, ts):
+        with open(os.path.join(BASEPATH, file_to_write), 'w') as f:
+            f.write(str(ts))
+        logging.info('Updated %s with timestamp %s', file_to_write, ts)
+
+
+    def ts_to_date(self, ts):
+        # We get ts in milliseconds
+        return datetime.utcfromtimestamp(ts/1000).strftime('%Y-%m-%d')
+
+
+    def get_almalinux_errata_href(self, errata, dist):
+        # Some erratas aren't including the reference to 'AL' ids.
+        # For this reason, we need to format the url manually
+        dist_version = dist.split("-")[-1]
+        errata_id = errata['updateinfo_id'].replace(':', '-')
+        href = f'https://errata.almalinux.org/{dist_version}/{errata_id}.html'
+
+        return href
+
+
+if __name__ == '__main__':
+    args = parse_args()
+
+    # When using --verbose or -v the logging output will go to console
+    # and will disable logging into a file. This option is only recommended
+    # to be used when doing debugging or testing of the script.
+    if not args.verbose:
+        logfile = args.logfile if args.logfile else LOGFILE
+    else:
+        logfile = None
+
+    logging.basicConfig(filename=logfile,
+                        format='%(asctime)s %(levelname)s %(message)s',
+                        level=logging.DEBUG)
+
+    errata_notifications = ErrataEmailNotifications(
+            args.distributions,
+            args.sender,
+            args.recipient)
+
+    errata_notifications.run()
