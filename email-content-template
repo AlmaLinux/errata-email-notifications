@@ -1,4 +1,6 @@
-Hi, you are receiving an AlmaLinux $errata_type update email because you subscribed to receive errata notifications from AlmaLinux.
+Hi,
+
+You are receiving an AlmaLinux $errata_type update email because you subscribed to receive errata notifications from AlmaLinux.
 
 AlmaLinux: $almalinux_version
 Type: $errata_type
@@ -15,4 +17,4 @@ This message is automatically generated, please don’t reply. For further quest
 Want to change your notification settings? Sign in and manage mailing lists on https://lists.almalinux.org.
 
 Kind regards,
-AlmaLinux team
+AlmaLinux Team
