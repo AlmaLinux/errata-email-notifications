@@ -158,6 +158,7 @@ class ErrataEmailNotifications:
                     errata_title=errata['title']
                 )
                 email_content = CONTENT_TEMPLATE.substitute(
+                    almalinux_version=dist.split("-")[-1],
                     errata_type=errata['type'].capitalize(),
                     errata_severity=errata['severity'].capitalize(),
                     errata_date=self.ts_to_date(errata['updated_date']['$date']),

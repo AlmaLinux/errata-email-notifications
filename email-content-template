@@ -1,5 +1,6 @@
 Hi, you are receiving an AlmaLinux $errata_type update email because you subscribed to receive errata notifications from AlmaLinux.
 
+AlmaLinux: $almalinux_version
 Type: $errata_type
 Severity: $errata_severity
 Release date: $errata_date
