@@ -1,0 +1,162 @@
+#!/usr/bin/env python3 
+# -*- coding: utf-8 -*-
+import argparse
+import logging
+import os
+import requests
+import smtplib
+import ssl
+import sys
+
+from datetime import datetime
+from datetime import timezone
+from email.message import EmailMessage
+from string import Template
+from feedgen.feed import FeedGenerator
+
+# For simplicity, we store files in the same folder as the script lives in.
+# These files are:
+#  * [distribution]_last_processed_ts: One file per distribution
+#  * app-passwd: Gmail application password
+#  * errata-email-notifications.log: File to save logging output
+# For this reason, we'll use BASEPATH anytime we read/write files and
+# can be changed in the future if needed
+BASEPATH = os.path.dirname(__file__)
+LOGFILE = os.path.join(BASEPATH, 'errata-feeder.log')
+
+DISTRIBUTIONS_ERRATA_URL = {
+    'almalinux-8': 'https://errata.almalinux.org/8/errata.full.json',
+    'almalinux-9': 'https://errata.almalinux.org/9/errata.full.json'
+}
+
+FULL_SENDER_NAME = 'AlmaLinux Errata Notifications'
+# We create the templates for both subject and content beforehand
+SUBJECT_TEMPLATE = Template('[$errata_type Advisory] $errata_id: $errata_summary ($errata_severity)')
+with open(os.path.join(BASEPATH, 'email-content-template'), 'r') as f:
+    CONTENT_TEMPLATE = Template(f.read())
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        'errata-email-notifications',
+        description='AlmaLinux errata email notifications script. Parses public errata files '
+                    'and sends email notifications to the recipient provided.'
+    )
+    parser.add_argument(
+        '-d', '--distributions', type=str, nargs='+',
+        required=True, choices=list(DISTRIBUTIONS_ERRATA_URL.keys()),
+        help='Distribution(s) to fetch/send errata notifications'
+    )
+
+    parser.add_argument(
+        '-l', '--logfile', type=str, required=False, dest='logfile',
+        help='Full path to the file to save logging output. If not set, ' \
+             'the logs will be saved into errata-email-notifications.log'
+    )
+    parser.add_argument(
+        '-v', '--verbose', required=False, action='store_true',
+        help='Whether you want to output logging info into console. ' \
+             'Note that enabling this option will stop the script to log ' \
+             'into the log file. Use it for debugging/testing purposes only.'
+    )
+
+    return parser.parse_args()
+
+
+class ErrataEmailNotifications:
+    def __init__(self, distributions):
+        self.distributions = distributions
+
+
+    def run(self):
+        logging.info('Starting execution of %s', __file__)
+        for dist in self.distributions:
+            logging.debug('Processing erratas for distribution %s', dist)
+            errata_json_url = DISTRIBUTIONS_ERRATA_URL[dist]
+            errata_data = self.fetch_errata_data(errata_json_url)
+            if not errata_data:
+                logging.warning('Could not fetch errata file for %s, skipping', dist)
+                continue
+
+        
+            feed = FeedGenerator()
+            feed.title('AlmaLinux Errata Feed')
+            feed.link(href='https://errata.almalinux.org', rel='alternate')
+            feed.description('Sample AlmaLinux Errata Feed')
+            feed.author(name='AlmaLinux Team', email='packager@almalinux.org')
+            feed.rss_str(pretty=True)
+
+            for erratum in reversed(errata_data):
+                title = f"[{erratum['id']}] {erratum['title']}"
+                link = self.get_almalinux_errata_href(erratum, dist)
+                pubDate = datetime.fromtimestamp(erratum['updated_date'], timezone.utc)
+
+                entry = feed.add_entry()
+                entry.title(title)
+                entry.link(href=link)
+                entry.description(erratum['description'])
+                entry.pubDate(pubDate)
+
+            print(feed.rss_str(pretty=True).decode('utf-8'))
+
+
+    def fetch_errata_data(self, url):
+        logging.debug('Fetching errata data from %s', url)
+        # TODO: If this script requires a considerable allocation of memory, we can
+        # figure out if we can publish the errata json files sorted by date.
+        # This way we can think about reading the response in chunks and stop reading
+        # when we reach the last_processed_ts. This could save some memory allocation
+        # during the execution of the script.
+        try:
+            response = requests.get(url)
+            data = response.json()
+            # We want to return sorted erratas in descending order
+            sorted_data = sorted(data['data'],
+                                 key=lambda x: x['updated_date'],
+                                 reverse=True)
+        except:
+            # Maybe more fine grained exception handling?
+            sorted_data = None
+        finally:
+            return sorted_data
+
+
+    def save_last_processed_ts(self, file_to_write, ts):
+        with open(os.path.join(BASEPATH, file_to_write), 'w') as f:
+            f.write(str(ts))
+        logging.info('Updated %s with timestamp %s', file_to_write, ts)
+
+
+    def ts_to_date(self, ts):
+        # We get ts in milliseconds
+        return datetime.utcfromtimestamp(ts/1000).strftime('%Y-%m-%d')
+
+
+    def get_almalinux_errata_href(self, errata, dist):
+        # Some erratas aren't including the reference to 'AL' ids.
+        # For this reason, we need to format the url manually
+        dist_version = dist.split("-")[-1]
+        errata_id = errata['id'].replace(':', '-')
+        href = f'https://errata.almalinux.org/{dist_version}/{errata_id}.html'
+
+        return href
+
+
+if __name__ == '__main__':
+    args = parse_args()
+
+    # When using --verbose or -v the logging output will go to console
+    # and will disable logging into a file. This option is only recommended
+    # to be used when doing debugging or testing of the script.
+    if not args.verbose:
+        logfile = args.logfile if args.logfile else LOGFILE
+    else:
+        logfile = None
+
+    logging.basicConfig(filename=logfile,
+                        format='%(asctime)s %(levelname)s %(message)s',
+                        level=logging.DEBUG)
+
+    errata_notifications = ErrataEmailNotifications(
+            args.distributions)
+
+    errata_notifications.run()
