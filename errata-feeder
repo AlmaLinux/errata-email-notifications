@@ -1,4 +1,4 @@
-#!/usr/bin/env python3 
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import argparse
 import logging
@@ -10,15 +10,12 @@ import sys
 
 from datetime import datetime
 from datetime import timezone
-from email.message import EmailMessage
 from string import Template
 from feedgen.feed import FeedGenerator
 
 # For simplicity, we store files in the same folder as the script lives in.
 # These files are:
-#  * [distribution]_last_processed_ts: One file per distribution
-#  * app-passwd: Gmail application password
-#  * errata-email-notifications.log: File to save logging output
+#  * errata-feeder.log: File to save logging output
 # For this reason, we'll use BASEPATH anytime we read/write files and
 # can be changed in the future if needed
 BASEPATH = os.path.dirname(__file__)
@@ -29,28 +26,22 @@ DISTRIBUTIONS_ERRATA_URL = {
     'almalinux-9': 'https://errata.almalinux.org/9/errata.full.json'
 }
 
-FULL_SENDER_NAME = 'AlmaLinux Errata Notifications'
-# We create the templates for both subject and content beforehand
-SUBJECT_TEMPLATE = Template('[$errata_type Advisory] $errata_id: $errata_summary ($errata_severity)')
-with open(os.path.join(BASEPATH, 'email-content-template'), 'r') as f:
-    CONTENT_TEMPLATE = Template(f.read())
-
 def parse_args():
     parser = argparse.ArgumentParser(
-        'errata-email-notifications',
-        description='AlmaLinux errata email notifications script. Parses public errata files '
-                    'and sends email notifications to the recipient provided.'
+        'errata-feeder',
+        description='AlmaLinux errata feed generation script. Parses public errata files '
+                    'and output RSS to stdout.'
     )
     parser.add_argument(
         '-d', '--distributions', type=str, nargs='+',
         required=True, choices=list(DISTRIBUTIONS_ERRATA_URL.keys()),
-        help='Distribution(s) to fetch/send errata notifications'
+        help='Distribution(s) to fetch/generate errata feed'
     )
 
     parser.add_argument(
         '-l', '--logfile', type=str, required=False, dest='logfile',
         help='Full path to the file to save logging output. If not set, ' \
-             'the logs will be saved into errata-email-notifications.log'
+             'the logs will be saved into errata-feeder.log'
     )
     parser.add_argument(
         '-v', '--verbose', required=False, action='store_true',
@@ -62,7 +53,7 @@ def parse_args():
     return parser.parse_args()
 
 
-class ErrataEmailNotifications:
+class ErrataFeeder:
     def __init__(self, distributions):
         self.distributions = distributions
 
@@ -158,7 +149,7 @@ if __name__ == '__main__':
                         format='%(asctime)s %(levelname)s %(message)s',
                         level=logging.DEBUG)
 
-    errata_notifications = ErrataEmailNotifications(
+    errata_feeder = ErrataFeeder(
             args.distributions)
 
-    errata_notifications.run()
+    errata_feeder.run()
