@@ -77,11 +77,12 @@ class ErrataEmailNotifications:
                 logging.warning('Could not fetch errata file for %s, skipping', dist)
                 continue
 
-        
+            dist_ver = dist.split("-")[-1]
+
             feed = FeedGenerator()
-            feed.title('AlmaLinux Errata Feed')
+            feed.title(f'AlmaLinux {dist_ver} Errata Feed')
             feed.link(href='https://errata.almalinux.org', rel='alternate')
-            feed.description('Sample AlmaLinux Errata Feed')
+            feed.description(f'Errata Notification for AlmaLinux {dist_ver}')
             feed.author(name='AlmaLinux Team', email='packager@almalinux.org')
             feed.rss_str(pretty=True)
 
@@ -89,11 +90,12 @@ class ErrataEmailNotifications:
                 title = f"[{erratum['id']}] {erratum['title']}"
                 link = self.get_almalinux_errata_href(erratum, dist)
                 pubDate = datetime.fromtimestamp(erratum['updated_date'], timezone.utc)
+                content= f"<pre>{erratum['description']}</pre>"
 
                 entry = feed.add_entry()
                 entry.title(title)
                 entry.link(href=link)
-                entry.description(erratum['description'])
+                entry.content(content, type='CDATA')
                 entry.pubDate(pubDate)
 
             print(feed.rss_str(pretty=True).decode('utf-8'))
