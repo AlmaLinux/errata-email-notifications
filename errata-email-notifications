@@ -24,7 +24,8 @@ LOGFILE = os.path.join(BASEPATH, 'errata-email-notifications.log')
 
 DISTRIBUTIONS_ERRATA_URL = {
     'almalinux-8': 'https://errata.almalinux.org/8/errata.json',
-    'almalinux-9': 'https://errata.almalinux.org/9/errata.json'
+    'almalinux-9': 'https://errata.almalinux.org/9/errata.json',
+    'almalinux-10': 'https://errata.almalinux.org/10/errata.json',
 }
 
 FULL_SENDER_NAME = 'AlmaLinux Errata Notifications'
